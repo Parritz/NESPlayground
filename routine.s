@@ -12,7 +12,7 @@
 
 .segment "RODATA"
   coolPalette:
-    .byte $12, $05, $17, $1A
+    .byte $12, $05, $17, $1B
     .byte $12, $35, $28, $31
     .byte $12, $47, $23, $34
     .byte $12, $39, $67, $1A
@@ -30,6 +30,7 @@
 .segment "DATA"
   gravity = 1
   maxYV = 10
+  screenHeight = 208
 
 .segment "ZEROPAGE"
   marioX: .res 1
@@ -97,11 +98,10 @@ NMI:
     adc #gravity
     sta marioYV
 
-  
   addYV:
     lda marioY
     sec
-    cmp #208
+    cmp #screenHeight
     bcs @done
     clc
     adc marioYV
