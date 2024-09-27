@@ -1,41 +1,67 @@
 .segment "HEADER"
-  ; .byte "NES", $1A      ; iNES header identifier
-  .byte $4E, $45, $53, $1A
-  .byte 2               ; 2x 16KB PRG code
-  .byte 1               ; 1x  8KB CHR data
-  .byte $01, $00        ; mapper 0, vertical mirroring
+  .byte "NES"
+  .byte $1A
+  .byte $02 ; 2 16kb PRG ROM chips
+  .byte $01 ; 1 8kb CHR ROM chip
+  .byte %00000000 ; mapper and mirroring
+  .byte $00
+  .byte $00
+  .byte $00
+  .byte $00
+  .byte $00, $00, $00, $00, $00 ; filler bytes
 
-.segment "VECTORS"
-  .word NMI        ; NMI vector
-  .word RESET      ; Reset vector
-  .word 0          ; IRQ/BRK vector (not used)
+.segment "RODATA"
+  coolPalette:
+    .byte $12, $05, $17, $1A
+    .byte $12, $35, $28, $31
+    .byte $12, $47, $23, $34
+    .byte $12, $39, $67, $1A
+    .byte $12, $05, $17, $1A
+    .byte $12, $35, $28, $31
+    .byte $12, $47, $23, $34
+    .byte $12, $39, $67, $1A
 
+  mario:
+    .byte $00, $36, $00, $00
+    .byte $00, $37, $00, $08
+    .byte $08, $38, $00, $00
+    .byte $08, $39, $00, $08
+
+.segment "DATA"
+  gravity = 1
+  maxYV = 10
+
+.segment "ZEROPAGE"
+  marioX: .res 1
+  marioY: .res 1
+  marioXV: .res 1
+  marioYV: .res 1
+
+.segment "STARTUP"
+  .include "resetroutine.s"
 
 .segment "CODE"
-RESET:
-  SEI             ; Disable interrupts
-  CLD             ; Clear decimal mode
-  LDX #$FF        ; Stack goes down rather than up, so we gotta get it ready
-  TXS             ; Set up stack
-  INX             ; X = 0
-  STX $2000       ; Disable NMI
-  STX $2001       ; Disable rendering
-  STX $4010       ; Disable DMC IRQs
 
-  LDA #%00010000   ; Enable sprites
-  STA $2001
+  lda #$3F
+  sta $2006
+  lda #$00
+  sta $2006
 
-  ; Initialize PPU
-  LDA #$00
-  STA $2000
-  STA $2001
-  STA $2002
-
-  ; Set up NMI
-  LDA #%10000000  ; Enable NMI
-  STA $2000
-
-  CLI             ; Enable interrupts
+  ; Write colors to the palette
+  loadPalettes:
+    LDA coolPalette, X
+    STA $2007
+    INX
+    CPX #32
+    BNE loadPalettes
+  
+  ldx #0
+  loadSprite:
+    LDA mario, X
+    STA $0200, X
+    INX
+    CPX #16
+    BNE loadSprite
 
 Forever:
   JMP Forever     ; Infinite loop
@@ -44,51 +70,56 @@ NMI:
   PHA             ; Push A to the stack
   LDA $2002       ; Read PPU status to clear the VBlank flag
 
-  ; Set up the palette address
-  LDA #$3F
-  STA $2006       ; High byte of palette address
-  LDA #$00
-  STA $2006       ; Low byte of palette address
+  ldx #0
+  setMarioPos:
+    lda mario+3, x
+    adc marioX
+    sta $0203, x
+    lda mario, x
+    adc marioY
+    sta $0200, x
+    inx
+    inx
+    inx
+    inx
+    cpx #16
+    bne setMarioPos
 
-  ; Write colors to the palette
-  LDA #$01       ; Background color (index 0)
-  STA $2007      ; Write background color
-  LDA #$10       ; Red color (index 1)
-  STA $2007      ; Write red color
-  LDA #$00       ; Black (index 2)
-  STA $2007
-  LDA #$00       ; Black (index 3)
-  STA $2007
 
-  ; OAM Write
-  LDA #$80        ; set y pos (128 FUCK YOU COPILOT)
-  STA $0200       ; store y pos
-  LDA #$00        ; set tile index thingy
-  STA $0201       ; store tile index
-  LDA #$01        ; Attributes uh red
-  STA $0202       ; store attributes
-  LDA #$80        ; set x pos (128)
-  STA $0203       ; storeX position
+  lda marioYV
+  sec
+  cmp #maxYV
+  bcc addGrav
+  jmp addYV
+
+  addGrav:
+    clc
+    adc #gravity
+    sta marioYV
+
+  
+  addYV:
+    lda marioY
+    sec
+    cmp #208
+    bcs @done
+    clc
+    adc marioYV
+    sta marioY
+    
+@done:
+  lda #$00
+  sta $2003
+  lda #$02
+  sta $4014
 
   PLA             ; Pull A back from the stack
   RTI             ; Return from interrupt
 
+.segment "VECTORS"
+  .word NMI        ; NMI vector
+  .word Reset      ; Reset vector
+  .word 0          ; IRQ/BRK vector (not used)
 
 .segment "CHARS"
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-
-  .byte %00000000
-  .byte %00000000
-  .byte %00000000
-  .byte %00000000
-  .byte %00000000
-  .byte %00000000
-  .byte %00000000
-  .byte %00000000
+  .incbin "mario.chr"
