@@ -10,6 +10,7 @@
   .word RESET      ; Reset vector
   .word 0          ; IRQ/BRK vector (not used)
 
+
 .segment "CODE"
 RESET:
   SEI             ; Disable interrupts
@@ -20,6 +21,9 @@ RESET:
   STX $2000       ; Disable NMI
   STX $2001       ; Disable rendering
   STX $4010       ; Disable DMC IRQs
+
+  LDA #%00010000   ; Enable sprites
+  STA $2001
 
   ; Initialize PPU
   LDA #$00
@@ -41,45 +45,50 @@ NMI:
   LDA $2002       ; Read PPU status to clear the VBlank flag
 
   ; Set up the palette address
-  LDA #$3F                    ; High byte of $3F00 (palette address) me when copilot writes the comment for me
-  STA $2006
-  LDA #$00                    ; Low byte of $3F00 SKIBIDI I BEAT COPILOT FUCK YOU
-  STA $2006
+  LDA #$3F
+  STA $2006       ; High byte of palette address
+  LDA #$00
+  STA $2006       ; Low byte of palette address
 
-  ; Write color to the palette
-  LDA #$01                    ; load color from palette
-  STA $2007                   ; write color to palette
+  ; Write colors to the palette
+  LDA #$01       ; Background color (index 0)
+  STA $2007      ; Write background color
+  LDA #$10       ; Red color (index 1)
+  STA $2007      ; Write red color
+  LDA #$00       ; Black (index 2)
+  STA $2007
+  LDA #$00       ; Black (index 3)
+  STA $2007
+
+  ; OAM Write
+  LDA #$80        ; set y pos (128 FUCK YOU COPILOT)
+  STA $0200       ; store y pos
+  LDA #$00        ; set tile index thingy
+  STA $0201       ; store tile index
+  LDA #$01        ; Attributes uh red
+  STA $0202       ; store attributes
+  LDA #$80        ; set x pos (128)
+  STA $0203       ; storeX position
 
   PLA             ; Pull A back from the stack
   RTI             ; Return from interrupt
 
 
+.segment "CHARS"
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
 
-VBlank2:
-  ; Your VBlank handling code here
-  ; Example: updating the screen, handling sprite logic, etc.
-
-    ; check if vblank2 is ready
-    ; BIT $2002
-    ; BPL VBlank2
-
-    ; LDA #$20                    ; point to nametable 0 in VRAM
-    ; STA $2006
-    ; LDA #$00
-    ; STA $2006
-
-    ; LDA #$20                    ; point to first nametable in VRAM
-    ; STA $2006
-    ; LDA #$00
-    ; STA $2006
-
-    ; LDY #$00
-    ; LDX #$04
-
-    LDA #$3F ; load color from palette nom nom (blackie)
-    STA $2006  ; load the high byte of the address (thanks copilot for fucking stealing this comment from me)
-    LDA #$16 ; load lower byte I BEAT COPILOT IM SIGMA
-    STA $2006 ; load it into thingy
-    STA $2007 ; load it into other ppu thingy
-
-  RTI             ; Return from subroutine
+  .byte %00000000
+  .byte %00000000
+  .byte %00000000
+  .byte %00000000
+  .byte %00000000
+  .byte %00000000
+  .byte %00000000
+  .byte %00000000
