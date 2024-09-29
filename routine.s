@@ -12,7 +12,7 @@
 
 .segment "RODATA"
   coolPalette:
-    .byte $12, $05, $17, $1B
+    .byte $12, $05, $17, $1A
     .byte $12, $35, $28, $31
     .byte $12, $47, $23, $34
     .byte $12, $39, $67, $1A
@@ -21,22 +21,25 @@
     .byte $12, $47, $23, $34
     .byte $12, $39, $67, $1A
 
-  mario:
-    .byte $00, $36, $00, $00
-    .byte $00, $37, $00, $08
-    .byte $08, $38, $00, $00
-    .byte $08, $39, $00, $08
+  player:
+    .byte $00, $00, $00, $00 ; Y pos, tile index, attributes, X pos
+    .byte $00, $01, $00, $08
+    .byte $08, $02, $00, $00
+    .byte $08, $03, $00, $08
 
 .segment "DATA"
   gravity = 1
-  maxYV = 10
+  maxYV = 7
   screenHeight = 208
+  jumpHeight = 500
 
 .segment "ZEROPAGE"
-  marioX: .res 1
-  marioY: .res 1
-  marioXV: .res 1
-  marioYV: .res 1
+  playerX: .res 1
+  playerY: .res 1
+  playerXV: .res 1
+  playerYV: .res 1
+  isJumping: .res 1
+  onGround: .res 1
 
 .segment "STARTUP"
   .include "resetroutine.s"
@@ -50,64 +53,133 @@
 
   ; Write colors to the palette
   loadPalettes:
-    LDA coolPalette, X
-    STA $2007
-    INX
-    CPX #32
-    BNE loadPalettes
+    lda coolPalette, X
+    sta $2007
+    inx
+    cpx #32
+    bne loadPalettes
   
   ldx #0
   loadSprite:
-    LDA mario, X
-    STA $0200, X
-    INX
-    CPX #16
-    BNE loadSprite
+    lda player, X
+    sta $0200, X
+    inx
+    cpx #16
+    bne loadSprite
 
 Forever:
-  JMP Forever     ; Infinite loop
+  jmp Forever     ; Infinite loop
 
 NMI:
-  PHA             ; Push A to the stack
-  LDA $2002       ; Read PPU status to clear the VBlank flag
+  pha             ; Push A to the stack
+  lda $2002       ; Read PPU status to clear the VBlank flag
+  
+  ; Start reading controller input
+  lda #$01
+  sta $4016
+  lda #$00
+  sta $4016
+
+  ReadA:
+    ; Check if A button is pressed
+    lda $4016
+    and #$01
+    beq ANotPressed
+
+    lda #$01
+    sta isJumping
+    jmp ReadADone
+  
+  ANotPressed:
+    lda #$00
+    sta isJumping
+
+  ReadADone:
 
   ldx #0
-  setMarioPos:
-    lda mario+3, x
-    adc marioX
+  setPlayerPos:
+    clc
+    lda player+3, x
+    adc playerX
     sta $0203, x
-    lda mario, x
-    adc marioY
+    lda player, x
+    adc playerY
     sta $0200, x
     inx
     inx
     inx
     inx
     cpx #16
-    bne setMarioPos
+    bne setPlayerPos
 
 
-  lda marioYV
+  lda playerYV
   sec
   cmp #maxYV
   bcc addGrav
   jmp addYV
 
   addGrav:
+    lda onGround
+    cmp #$01
+    beq addYV
+
+    lda playerYV
+
     clc
     adc #gravity
-    sta marioYV
+    sta playerYV
 
   addYV:
-    lda marioY
+    ; Check if the player is on the ground
+    lda playerY
     sec
     cmp #screenHeight
-    bcs @done
+    bcs setOnGround
+
+    ; Set onGround to false
+    ldx #$00
+    stx onGround
+
+    lda isJumping
+    cmp #$01
+    beq handleJump
+
+    lda playerY
+
+    ; Add player velocity to Y position
     clc
-    adc marioYV
-    sta marioY
+    adc playerYV
+    sta playerY
+    jmp done
+
+  setOnGround:
+    ; Reset player velocity
+    lda #$00
+    sta playerYV
+
+    ; Set onGround
+    lda #$01
+    sta onGround
+    jmp handleJump
     
-@done:
+  handleJump:
+    ; Check if player is jumping
+    lda isJumping
+    cmp #$00
+    beq done ; Skip jump logic
+
+    ; Check if player is on the ground
+    lda onGround
+    cmp #$00
+    beq done ; Skip jump logic
+
+    clc
+    lda playerY
+    sbc jumpHeight
+    sta playerY
+    
+done:
   lda #$00
   sta $2003
   lda #$02
@@ -122,4 +194,4 @@ NMI:
   .word 0          ; IRQ/BRK vector (not used)
 
 .segment "CHARS"
-  .incbin "mario.chr"
+  .incbin "shapes.chr"
