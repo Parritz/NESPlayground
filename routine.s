@@ -38,7 +38,7 @@
   playerY: .res 1
   playerXV: .res 1
   playerYV: .res 1
-  jumpV: .res 1
+  ; jumpV: .res 1
   isJumping: .res 1
   onGround: .res 1
 
@@ -121,12 +121,11 @@ NMI:
   jmp addYV
 
   addGrav:
-    lda onGround
-    cmp #1
-    beq addYV
+    ; lda onGround
+    ; cmp #1
+    ; beq addYV
 
     lda playerYV
-
     clc
     adc #gravity
     sta playerYV
@@ -141,6 +140,7 @@ NMI:
     ldx #0
     stx onGround
 
+    ; If the player is jumping, skip the gravity logic
     ldx isJumping
     cpx #1
     beq handleJump
@@ -153,13 +153,13 @@ NMI:
 
   setOnGround:
     ; Reset player velocity
-    lda #0
-    sta playerYV
-    sta jumpHeight
+    ; lda #0
+    ; sta playerYV
+    ; sta jumpHeight
 
-    ; Reset jump velocity
-    lda #1
-    sta jumpV
+    ; ; Reset jump velocity
+    ; lda #1
+    ; sta jumpV
 
     ; Set onGround
     lda #1
@@ -178,24 +178,20 @@ NMI:
     ; Increase player y position 
     lda playerY
     sec
-    sbc jumpV
+    sbc playerYV
     sta playerY
 
     ; Acceleration
-    lda jumpV
-    clc
-    adc #1
-    sta jumpV
-
+    ; lda jumpV
+    ; clc
+    ; adc #1
+    ; sta jumpV
 
     cmp #jumpHeight
     bcc done
 
     lda #0
     sta isJumping
-
-    lda #1
-    sta jumpV
     
 done:
   lda #$00
@@ -203,8 +199,8 @@ done:
   lda #$02
   sta $4014
 
-  PLA             ; Pull A back from the stack
-  RTI             ; Return from interrupt
+  pla             ; Pull A back from the stack
+  rti             ; Return from interrupt
 
 .segment "VECTORS"
   .word NMI        ; NMI vector
