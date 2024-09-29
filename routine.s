@@ -29,15 +29,16 @@
 
 .segment "DATA"
   gravity = 1
-  maxYV = 7
+  maxYV = 4
   screenHeight = 208
-  jumpHeight = 500
+  jumpHeight = 12
 
 .segment "ZEROPAGE"
   playerX: .res 1
   playerY: .res 1
   playerXV: .res 1
   playerYV: .res 1
+  jumpV: .res 1
   isJumping: .res 1
   onGround: .res 1
 
@@ -75,24 +76,25 @@ NMI:
   lda $2002       ; Read PPU status to clear the VBlank flag
   
   ; Start reading controller input
-  lda #$01
+  lda #1
   sta $4016
-  lda #$00
+  lda #0
   sta $4016
 
   ReadA:
     ; Check if A button is pressed
     lda $4016
-    and #$01
-    beq ANotPressed
+    and #1
+    beq ReadADone
 
-    lda #$01
+    ; Check if the player is on the ground
+    ldx onGround
+    cpx #0
+    beq ReadADone
+
+    lda #1
     sta isJumping
     jmp ReadADone
-  
-  ANotPressed:
-    lda #$00
-    sta isJumping
 
   ReadADone:
 
@@ -112,7 +114,6 @@ NMI:
     cpx #16
     bne setPlayerPos
 
-
   lda playerYV
   sec
   cmp #maxYV
@@ -121,7 +122,7 @@ NMI:
 
   addGrav:
     lda onGround
-    cmp #$01
+    cmp #1
     beq addYV
 
     lda playerYV
@@ -133,19 +134,16 @@ NMI:
   addYV:
     ; Check if the player is on the ground
     lda playerY
-    sec
     cmp #screenHeight
     bcs setOnGround
 
     ; Set onGround to false
-    ldx #$00
+    ldx #0
     stx onGround
 
-    lda isJumping
-    cmp #$01
+    ldx isJumping
+    cpx #1
     beq handleJump
-
-    lda playerY
 
     ; Add player velocity to Y position
     clc
@@ -155,29 +153,49 @@ NMI:
 
   setOnGround:
     ; Reset player velocity
-    lda #$00
+    lda #0
     sta playerYV
+    sta jumpHeight
+
+    ; Reset jump velocity
+    lda #1
+    sta jumpV
 
     ; Set onGround
-    lda #$01
+    lda #1
     sta onGround
     jmp handleJump
     
   handleJump:
     ; Check if player is jumping
     lda isJumping
-    cmp #$00
+    cmp #0
     beq done ; Skip jump logic
 
-    ; Check if player is on the ground
-    lda onGround
-    cmp #$00
-    beq done ; Skip jump logic
+    jmp jump
 
-    clc
+  jump:
+    ; Increase player y position 
     lda playerY
-    sbc jumpHeight
+    sec
+    sbc jumpV
     sta playerY
+
+    ; Acceleration
+    lda jumpV
+    clc
+    adc #1
+    sta jumpV
+
+
+    cmp #jumpHeight
+    bcc done
+
+    lda #0
+    sta isJumping
+
+    lda #1
+    sta jumpV
     
 done:
   lda #$00
