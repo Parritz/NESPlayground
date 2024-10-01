@@ -92,6 +92,11 @@ NMI:
     cpx #0
     beq ReadADone
 
+    ; Set player velocity for the jump
+    ; This will start high then go down 
+    ldx #7
+    stx playerYV
+
     lda #1
     sta isJumping
     jmp ReadADone
@@ -114,6 +119,8 @@ NMI:
     cpx #16
     bne setPlayerPos
 
+  ; Check if the player's Y velocity is at its max, and if it is, don't apply gravity
+  ; Instead, continue applying the player's current Y velocity
   lda playerYV
   sec
   cmp #maxYV
@@ -121,9 +128,12 @@ NMI:
   jmp addYV
 
   addGrav:
-    ; lda onGround
-    ; cmp #1
-    ; beq addYV
+    ; Temporary check for not applying gravity when the player is on the ground
+    ; This will have to be changed so that when the player has reached their jump height destination,
+    ; they will start falling back down and accelerating with gravity again
+    lda onGround
+    cmp #1
+    beq addYV
 
     lda playerYV
     clc
